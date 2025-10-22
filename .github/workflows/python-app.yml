@@ -1,0 +1,55 @@
+name: Python Tests
+
+on:
+  push:
+    branches: [ "main", "dev", "staging", "feature/*" ]
+  pull_request:
+    branches: [ "main", "dev", "staging" ]
+
+env:
+  PYTHONPATH: "."
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 pytest
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        
+    - name: Code linting
+      run: |
+        echo "=== 严格检查：语法错误和未定义名称 ==="
+        flake8 app/ tests/ --count --select=E9,F63,F7,F82 --show-source --statistics
+        
+        echo "=== 代码风格检查（作为警告）==="
+        flake8 app/ tests/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        
+    - name: Run tests
+      run: |
+        echo "=== 运行测试套件 ==="
+        pytest tests/ -v --tb=short --junit-xml=pytest-results.xml
+        
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: pytest-results
+        path: pytest-results.xml
+        retention-days: 7
